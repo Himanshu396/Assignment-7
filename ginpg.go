@@ -43,6 +43,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 	// check the connection
 	err = db.Ping()
 
@@ -52,7 +53,7 @@ func main() {
 	fmt.Println("Successfully connected!")
 	//return db
 
-	// db, err := sql.Open("mysql", "root:root@tcp(localhost:3306)/people_db")
+	// db, err := sql.Open("mysql", "root:root@tcp(localhost:3306)/product_db")
 	// if err != nil {
 	// 	// fmt.Print(err.Error())
 	// 	fmt.Println("Error creating DB:", err)
@@ -67,7 +68,7 @@ func main() {
 
 	type People struct {
 		Id      int    `db:"ID" json:"id"`
-		Name    string `db:  Name" json:  Name"`
+		Name    string `db:"Name" json:"Name"`
 		Address string `db:"Address" json:"Address"`
 		Age     int    `db:"age" json:"age"`
 	}
@@ -76,9 +77,8 @@ func main() {
 
 	// GET a people detail
 	router.GET("/people/:id", func(c *gin.Context) {
-		var (
-			people People
-		)
+		var people People
+
 		//strconv.Atoi("-42")
 		// id := c.Query("id")
 		// id1,err = strconv.Atoi(id)
@@ -87,8 +87,10 @@ func main() {
 		// id := c.Params.ByName("id")
 		// id := c.PostForm("id")
 		id := c.Param("id")
-
-		rows, err := db.Query("select * from people where id = ?;", id)
+		//id, _ := strconv.Atoi(id1)
+		fmt.Println((id))
+		rows, err := db.Query("select * from people where id = $1;", id)
+		//rows, err := db.Query("select * from people ;")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
@@ -150,7 +152,7 @@ func main() {
 		// id, err := strconv.Atoi(c.PostForm("id"))
 		// fmt.Println("hello", id)
 		// //id := c.PostForm("id")
-		//  Name := c.PostForm(  Name")
+		// Name := c.PostForm("Name")
 		// Address := c.PostForm("Address")
 		// Age, err := strconv.Atoi(c.PostForm("Age"))
 		id := people.Id
@@ -160,16 +162,42 @@ func main() {
 		Address := people.Address
 		Age := people.Age
 		//Age := c.PostForm("Age")
-		stmt, err := db.Prepare("insert into people (id  Name, Address,Age) values(?,?,?,?);")
+
+		//UPDATED CODE
+		// sqlStatement := `INSERT INTO people (id,name, location, age) VALUES ($1, $2, $3,$4) RETURNING ID`
+		sqlStatement := `INSERT INTO people (id,Name, Address, age) VALUES ($1, $2, $3,$4) `
+
+		// the inserted id will store in this id
+		//var id int64
+
+		// execute the sql statement
+		// Scan function will save the insert id in the id
+		// err := db.QueryRow(sqlStatement, user.ID, user.Name, user.Location, user.Age).Scan(&id)
+		//(1) WAY
+		//err := db.QueryRow(sqlStatement, id, Name, Address, Age).Scan(&id)
+
+		if err != nil {
+			//log.Fatalf("Unable to execute the query. %v", err)
+			fmt.Print(err.Error())
+		}
+
+		//fmt.Printf("Inserted a single record %v", id)
+
+		// return the inserted id
+		//return id
+
+		//(2) WAY
+		stmt, err := db.Prepare(sqlStatement)
 		if err != nil {
 			fmt.Print(err.Error())
 		}
-		// _, err = stmt.Exec(&id,   Name, &Address, &Age)
+		// _, err = stmt.Exec(&id, &Name, &Address, &Age)
 		_, err = stmt.Exec(id, Name, Address, Age)
 
 		if err != nil {
 			fmt.Print(err.Error())
 		}
+		fmt.Printf("Inserted a single record %v", id)
 
 		// Fastest way to append strings
 		//buffer.WriteString(id)
@@ -181,7 +209,7 @@ func main() {
 
 		// buffer.WriteString(strconv.Itoa(Age))
 		//buffer.WriteString(Age)
-		defer stmt.Close()
+		//defer stmt.Close()
 		name := buffer.String()
 		c.JSON(http.StatusOK, gin.H{
 			"message": fmt.Sprintf(" %s %ssuccessfully created", Name, name),
@@ -192,7 +220,7 @@ func main() {
 	router.PUT("/people/:id", func(c *gin.Context) {
 		var buffer bytes.Buffer
 		// id := c.Query("id")
-		//  Name := c.Query(  Name")
+		// Name := c.Query("Name")
 		// Address := c.Query("Address")
 		// Age := c.Query("Age")
 
@@ -205,7 +233,7 @@ func main() {
 		Name := people.Name
 		Address := people.Address
 		Age := people.Age
-		stmt, err := db.Prepare("update people set  Name= ?, Address= ?,Age=? where id= ?;")
+		stmt, err := db.Prepare("update people set Name= $1, Address= $2,Age=$3 where id= $4;")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
@@ -236,7 +264,7 @@ func main() {
 		c.Bind(&people)
 		// id := people.Id
 		id := c.Param("id")
-		stmt, err := db.Prepare("delete from people where id= ?;")
+		stmt, err := db.Prepare("delete from people where id= $1;")
 		if err != nil {
 			fmt.Print(err.Error())
 		}
